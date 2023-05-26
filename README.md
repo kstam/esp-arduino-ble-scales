@@ -7,10 +7,17 @@ This library defines3 main abstract concepts:
 
 This allows for easy extention of the library for more bluetooth enabled scales. 
 
+### Currently implemented scales
+
+* Acaia Lunar (Tested)
+* Acaia Pearl (Untested but should be supported)
+
+Want a specific model? Implement it 🚀 Read on to find out how... 
+
 ### How do implement new scales
 
 We can do this either in this repo or in a separate repo. In both cases we need to:
-1. Create a class for the new Scales (i.e. `AcaiaScales`) that implements the protocol of the scales and extends `RemoteScales`
+1. Create a class for the new Scales (i.e. `AcaiaScales`) that implements the protocol of the scales and extends `RemoteScales`. This is 99.9% of the work as it involves reverse engineering or reading the datasheet of the scales and implementing it accordingly. 
 2. Create a plugin (i.e. `AcaiaScalesPlugin`) that extends `RemoteScalesPlugin` and implement an `apply()` method which should register the plugin to the `RemoteScalesPluginRegistry` singleton.
 3. Import your new library together with the `remote_scales` library and apply your plugin (i.e. `MyScalesPlugin::apply()`) during the initialisaion phase. 
 

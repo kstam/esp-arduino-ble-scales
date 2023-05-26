@@ -5,18 +5,15 @@
 // ------------------------   Common RemoteScales methods    ------------------------------
 // ---------------------------------------------------------------------------------------
 
-void RemoteScales::log(const char* format, ...) {
-  if (!debugPort) return;
-
-  std::array<char, 128>buffer;
+void RemoteScales::log(std::string msgFormat, ...) {
+  if (!this->logCallback) return;
   va_list args;
-  va_start(args, format);
-  vsnprintf(buffer.data(), buffer.size(), format, args);
+  va_start(args, msgFormat);
+  int length = vsnprintf(nullptr, 0, msgFormat.c_str(), args); // Find length of string
+  std::string formattedMessage(length, '\0'); // Instantiate formatted strigng with correct length
+  vsnprintf(&formattedMessage[0], length + 1, msgFormat.c_str(), args); // print formatted message in the string
   va_end(args);
-  debugPort->print("Scale[");
-  debugPort->print(device.getName().c_str());
-  debugPort->print("]: ");
-  debugPort->print(buffer.data());
+  logCallback("Scale[" + device.getName() + "] " + formattedMessage);
 }
 
 void RemoteScales::setWeight(float newWeight) {

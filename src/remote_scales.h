@@ -9,10 +9,11 @@ class RemoteScales {
 
 public:
   using WeightUpdatedCallback = void (*)(float);
+  using LogCallback = void (*)(std::string);
   RemoteScales(BLEAdvertisedDevice device) : device(device) {}
 
   BLEAdvertisedDevice* getDevice() { return &device; }
-  void setDebugPort(Stream* debugPort) { this->debugPort = debugPort; }
+  void setLogCallback(LogCallback logCallback) { this->logCallback = logCallback; }
   void setWeightUpdatedCallback(WeightUpdatedCallback callback) { weightCallback = callback; }
   void setWeight(float newWeight);
   float getWeight() { return weight; }
@@ -22,13 +23,13 @@ public:
   virtual bool connect() = 0;
   virtual void disconnect() = 0;
   virtual void update() = 0;
-  void log(const char* format, ...);
+  void log(std::string msgFormat, ...);
 
   static RemoteScales* getInstance(BLEAdvertisedDevice device);
 
 private:
   BLEAdvertisedDevice device;
-  Stream* debugPort;
+  LogCallback logCallback;
   WeightUpdatedCallback weightCallback;
   float weight = -3000.f;
 };
