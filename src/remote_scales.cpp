@@ -1,11 +1,11 @@
-#include "remote_scale.h"
-#include "remote_scale_plugin_registry.h"
+#include "remote_scales.h"
+#include "remote_scales_plugin_registry.h"
 
 // ---------------------------------------------------------------------------------------
-// ------------------------   Common RemoteScale methods    ------------------------------
+// ------------------------   Common RemoteScales methods    ------------------------------
 // ---------------------------------------------------------------------------------------
 
-void RemoteScale::log(const char* format, ...) {
+void RemoteScales::log(const char* format, ...) {
   if (!debugPort) return;
 
   std::array<char, 128>buffer;
@@ -19,7 +19,7 @@ void RemoteScale::log(const char* format, ...) {
   debugPort->print(buffer.data());
 }
 
-void RemoteScale::setWeight(float newWeight) {
+void RemoteScales::setWeight(float newWeight) {
   if (weight != newWeight && weightCallback != nullptr) {
     weight = newWeight;
     weightCallback(newWeight);
@@ -28,10 +28,10 @@ void RemoteScale::setWeight(float newWeight) {
 
 
 // ---------------------------------------------------------------------------------------
-// ------------------------   RemoteScale methods    ------------------------------
+// ------------------------   RemoteScales methods    ------------------------------
 // ---------------------------------------------------------------------------------------
 
-void RemoteScaleScanner::initializeAsyncScan() {
+void RemoteScalesScanner::initializeAsyncScan() {
   cleanupDiscoveredScales();
 
   BLEDevice::getScan()->setAdvertisedDeviceCallbacks(this);
@@ -41,30 +41,30 @@ void RemoteScaleScanner::initializeAsyncScan() {
   BLEDevice::getScan()->start(0, [](BLEScanResults) {}); // Set to 0 for continuous
 }
 
-void RemoteScaleScanner::stopAsyncScan() {
+void RemoteScalesScanner::stopAsyncScan() {
   BLEDevice::getScan()->stop();
   BLEDevice::getScan()->clearResults();
 }
 
-void RemoteScaleScanner::restartAsyncScan() {
+void RemoteScalesScanner::restartAsyncScan() {
   stopAsyncScan();
   initializeAsyncScan();
 }
 
-void RemoteScaleScanner::onResult(BLEAdvertisedDevice advertisedDevice) {
-  if (RemoteScalePluginRegistry::getInstance()->containsPluginForDevice(advertisedDevice)) {
-    discoveredScales.push_back(RemoteScalePluginRegistry::getInstance()->initialiseRemoteScale(advertisedDevice));
+void RemoteScalesScanner::onResult(BLEAdvertisedDevice advertisedDevice) {
+  if (RemoteScalesPluginRegistry::getInstance()->containsPluginForDevice(advertisedDevice)) {
+    discoveredScales.push_back(RemoteScalesPluginRegistry::getInstance()->initialiseRemoteScales(advertisedDevice));
   }
 }
 
-void RemoteScaleScanner::cleanupDiscoveredScales() {
+void RemoteScalesScanner::cleanupDiscoveredScales() {
   for (const auto& scale : discoveredScales) {
     delete scale;
   }
   discoveredScales.clear();
 }
 
-std::vector<RemoteScale*> RemoteScaleScanner::syncScan(uint16_t timeout) {
+std::vector<RemoteScales*> RemoteScalesScanner::syncScan(uint16_t timeout) {
   BLEScan* scanner = BLEDevice::getScan();
   scanner->setActiveScan(true);
   scanner->setInterval(100);
@@ -72,9 +72,9 @@ std::vector<RemoteScale*> RemoteScaleScanner::syncScan(uint16_t timeout) {
 
   BLEScanResults scanResults = scanner->start(timeout, false);
 
-  std::vector<RemoteScale*> scales;
+  std::vector<RemoteScales*> scales;
   for (int i = 0; i < scanResults.getCount(); i++) {
-    RemoteScale* scale = RemoteScale::getInstance(scanResults.getDevice(i));
+    RemoteScales* scale = RemoteScales::getInstance(scanResults.getDevice(i));
 
     if (scale != nullptr) {
       scales.push_back(scale);

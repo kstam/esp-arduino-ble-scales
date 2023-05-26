@@ -1,10 +1,11 @@
-#include "remote_scale_plugin_registry.h"
-RemoteScalePluginRegistry* RemoteScalePluginRegistry::instance = nullptr; // or NULL, or nullptr in c++11
+#include "remote_scales_plugin_registry.h"
 
 // ---------------------------------------------------------------------------------------
-// ------------------------   RemoteScalePluginRegistry    -------------------------------
+// ------------------------   RemoteScalesPluginRegistry    -------------------------------
 // ---------------------------------------------------------------------------------------
-void RemoteScalePluginRegistry::registerPlugin(RemoteScalePlugin plugin) {
+RemoteScalesPluginRegistry* RemoteScalesPluginRegistry::instance = nullptr;
+
+void RemoteScalesPluginRegistry::registerPlugin(RemoteScalesPlugin plugin) {
   // Check if a plugin with the same ID already exists
   for (const auto& existingPlugin : plugins) {
     if (existingPlugin.id == plugin.id) {
@@ -15,7 +16,7 @@ void RemoteScalePluginRegistry::registerPlugin(RemoteScalePlugin plugin) {
   plugins.push_back(plugin);
 }
 
-bool RemoteScalePluginRegistry::containsPluginForDevice(BLEAdvertisedDevice device) {
+bool RemoteScalesPluginRegistry::containsPluginForDevice(BLEAdvertisedDevice device) {
   for (const auto& plugin : plugins) {
     if (plugin.handles(device)) {
       return true;
@@ -24,7 +25,7 @@ bool RemoteScalePluginRegistry::containsPluginForDevice(BLEAdvertisedDevice devi
   return false;
 }
 
-RemoteScale* RemoteScalePluginRegistry::initialiseRemoteScale(BLEAdvertisedDevice device) {
+RemoteScales* RemoteScalesPluginRegistry::initialiseRemoteScales(BLEAdvertisedDevice device) {
   for (const auto& plugin : plugins) {
     if (plugin.handles(device)) {
       return plugin.initialise(device);

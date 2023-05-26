@@ -1,5 +1,5 @@
 #include "acaia.h"
-#include "remote_scale_plugin_registry.h"
+#include "remote_scales_plugin_registry.h"
 
 enum class AcaiaHeader : uint8_t {
   HEADER1 = 0xef,
@@ -41,16 +41,16 @@ std::string byteArrayToHexString(const uint8_t* byteArray, size_t length) {
 //-----------------------------------------------------------------------------------/
 //---------------------------        PUBLIC       -----------------------------------/
 //-----------------------------------------------------------------------------------/
-AcaiaScale::AcaiaScale(BLEAdvertisedDevice device) : RemoteScale(device) {}
+AcaiaScales::AcaiaScales(BLEAdvertisedDevice device) : RemoteScales(device) {}
 
-bool AcaiaScale::connect() {
+bool AcaiaScales::connect() {
   if (client.get() != nullptr && client->isConnected()) {
     return true;
   }
 
   client.reset(BLEDevice::createClient());
-  RemoteScale::log("Connecting to %s[%s]\n", RemoteScale::getDevice()->getName().c_str(), RemoteScale::getDevice()->getAddress().toString().c_str());
-  bool result = client->connect(RemoteScale::getDevice());
+  RemoteScales::log("Connecting to %s[%s]\n", RemoteScales::getDevice()->getName().c_str(), RemoteScales::getDevice()->getAddress().toString().c_str());
+  bool result = client->connect(RemoteScales::getDevice());
   if (!result) {
     client.release();
     return false;
@@ -62,27 +62,27 @@ bool AcaiaScale::connect() {
     return false;
   }
   subscribeToNotifications();
-  RemoteScale::setWeight(0.f);
+  RemoteScales::setWeight(0.f);
   return true;
 }
 
-void AcaiaScale::disconnect() {
+void AcaiaScales::disconnect() {
   if (client.get() != nullptr && client->isConnected()) {
-    RemoteScale::log("Disconnecting and cleaning up BLE client\n");
+    RemoteScales::log("Disconnecting and cleaning up BLE client\n");
     client->disconnect();
     client.release();
   }
 }
 
-bool AcaiaScale::isConnected() {
+bool AcaiaScales::isConnected() {
   return client != nullptr && client->isConnected();
 }
 
-void AcaiaScale::update() {
+void AcaiaScales::update() {
   sendHeartbeat();
 }
 
-bool AcaiaScale::tare() {
+bool AcaiaScales::tare() {
   if (!isConnected()) return false;
   uint8_t payload[] = { 0x00 };
   sendMessage(AcaiaMessageType::TARE, payload, sizeof(payload));
@@ -92,7 +92,7 @@ bool AcaiaScale::tare() {
 //-----------------------------------------------------------------------------------/
 //---------------------------       PRIVATE       -----------------------------------/
 //-----------------------------------------------------------------------------------/
-void AcaiaScale::notifyCallback(
+void AcaiaScales::notifyCallback(
   BLERemoteCharacteristic* pBLERemoteCharacteristic,
   uint8_t* pData,
   size_t length,
@@ -101,7 +101,7 @@ void AcaiaScale::notifyCallback(
   decodeAndHandleNotification(pData, length);
 }
 
-void AcaiaScale::decodeAndHandleNotification(uint8_t* data, size_t length) {
+void AcaiaScales::decodeAndHandleNotification(uint8_t* data, size_t length) {
   int messageStart = -1;
 
   for (size_t i = 0; i < length - 1; i++) {
@@ -112,7 +112,7 @@ void AcaiaScale::decodeAndHandleNotification(uint8_t* data, size_t length) {
   }
 
   if (messageStart < 0 || length - messageStart < 6) {
-    RemoteScale::log("Invalid message - Unexpected header: %s\n", byteArrayToHexString(data, length).c_str());
+    RemoteScales::log("Invalid message - Unexpected header: %s\n", byteArrayToHexString(data, length).c_str());
     return;
   }
 
@@ -120,7 +120,7 @@ void AcaiaScale::decodeAndHandleNotification(uint8_t* data, size_t length) {
   size_t messageLength = messageEnd - messageStart;
 
   if (messageEnd > length) {
-    RemoteScale::log("Invalid message - length out of bounds: %s\n", byteArrayToHexString(data, length).c_str());
+    RemoteScales::log("Invalid message - length out of bounds: %s\n", byteArrayToHexString(data, length).c_str());
     return;
   }
 
@@ -141,70 +141,70 @@ void AcaiaScale::decodeAndHandleNotification(uint8_t* data, size_t length) {
   }
 
   if (messageType == AcaiaMessageType::INFO) {
-    RemoteScale::log("Got info message: %s\n", byteArrayToHexString(data + messageStart, messageLength).c_str());
+    RemoteScales::log("Got info message: %s\n", byteArrayToHexString(data + messageStart, messageLength).c_str());
     // This normally means that something went wrong with the establishing a connection so we disconnect.
     disconnect();
   }
 
-  RemoteScale::log("Unknown message type %02X: %s\n", messageType, byteArrayToHexString(data + messageStart, messageLength).c_str());
+  RemoteScales::log("Unknown message type %02X: %s\n", messageType, byteArrayToHexString(data + messageStart, messageLength).c_str());
   return;
 }
 
-void AcaiaScale::handleScaleEventPayload(const uint8_t* payload, size_t length) {
+void AcaiaScales::handleScaleEventPayload(const uint8_t* payload, size_t length) {
   AcaiaEventType eventType = static_cast<AcaiaEventType>(payload[0]);
   if (eventType == AcaiaEventType::WEIGHT) {
-    RemoteScale::setWeight(decodeWeight(payload + 1));
+    RemoteScales::setWeight(decodeWeight(payload + 1));
   }
   else if (eventType == AcaiaEventType::ACK) {
     // Ignore for now.
     // Example: 0B 00 E0 05 5C 17 00 00 01 02 29 48
-    // RemoteScale::log("ACK - %s\n", byteArrayToHexString(payload, length).c_str());
-    // RemoteScale::log("Heartbeat response (weight: %0.1f time: %0.1f)\n", weight, time);
-    // RemoteScale::setWeight(decodeWeight(payload + 4));
+    // RemoteScales::log("ACK - %s\n", byteArrayToHexString(payload, length).c_str());
+    // RemoteScales::log("Heartbeat response (weight: %0.1f time: %0.1f)\n", weight, time);
+    // RemoteScales::setWeight(decodeWeight(payload + 4));
   }
   else if (eventType == AcaiaEventType::TIMER) {
     // Ignore for now
     // time = decodeTime(payload + 1);
-    // RemoteScale::log("TIMER - %s", byteArrayToHexString(payload, length).c_str());
-    // RemoteScale::log("Time:  %0.1f\n", time);
+    // RemoteScales::log("TIMER - %s", byteArrayToHexString(payload, length).c_str());
+    // RemoteScales::log("Time:  %0.1f\n", time);
   }
   else if (eventType == AcaiaEventType::KEY) {
     // Ignore for now
     // AcaiaEventKey eventKey = static_cast<AcaiaEventKey>(payload[1]);
     // if (eventKey == AcaiaEventKey::TARE) {
-    //   RemoteScale::setWeight(decodeWeight(payload + 2));
-    //   RemoteScale::log("TARE - %s", byteArrayToHexString(payload, length).c_str());
-    //   RemoteScale::log("Tare (weight:  %0.1f)\n", RemoteScale::getWeight());
+    //   RemoteScales::setWeight(decodeWeight(payload + 2));
+    //   RemoteScales::log("TARE - %s", byteArrayToHexString(payload, length).c_str());
+    //   RemoteScales::log("Tare (weight:  %0.1f)\n", RemoteScales::getWeight());
     // }
     // else if (eventKey == AcaiaEventKey::START) {
-    //   RemoteScale::setWeight(decodeWeight(payload + 2));
-    //   RemoteScale::log("START - %s", byteArrayToHexString(payload, length).c_str());
-    //   RemoteScale::log("Start (weight:  %0.1f)\n", RemoteScale::getWeight());
+    //   RemoteScales::setWeight(decodeWeight(payload + 2));
+    //   RemoteScales::log("START - %s", byteArrayToHexString(payload, length).c_str());
+    //   RemoteScales::log("Start (weight:  %0.1f)\n", RemoteScales::getWeight());
     // }
     // else if (eventKey == AcaiaEventKey::STOP) {
     //   time = decodeTime(payload + 2);
-    //   RemoteScale::setWeight(decodeWeight(payload + 6));
-    //   RemoteScale::log("STOP - %s", byteArrayToHexString(payload, length).c_str());
-    //   RemoteScale::log("Stop (weight:  %0.1f, time:  %0.1f)\n", RemoteScale::getWeight(), time);
+    //   RemoteScales::setWeight(decodeWeight(payload + 6));
+    //   RemoteScales::log("STOP - %s", byteArrayToHexString(payload, length).c_str());
+    //   RemoteScales::log("Stop (weight:  %0.1f, time:  %0.1f)\n", RemoteScales::getWeight(), time);
     // }
     // else if (eventKey == AcaiaEventKey::RESET) {
     //   time = decodeTime(payload + 2);
-    //   RemoteScale::setWeight(decodeWeight(payload + 6));
+    //   RemoteScales::setWeight(decodeWeight(payload + 6));
     //   // 08 08 05 00 00 00 00 01 01 13 0E
     //   // 08 0A 05 03 00 00 00 01 01 18 0E
-    //   RemoteScale::log("RESET - %s", byteArrayToHexString(payload, length).c_str());
-    //   RemoteScale::log("Reset (weight:  %0.1f, time:  %0.1f)\n", RemoteScale::getWeight(), time);
+    //   RemoteScales::log("RESET - %s", byteArrayToHexString(payload, length).c_str());
+    //   RemoteScales::log("Reset (weight:  %0.1f, time:  %0.1f)\n", RemoteScales::getWeight(), time);
     // }
     // else {
-    //   RemoteScale::log("Unknown key %02X(%d) - %s\n", eventKey, eventKey, byteArrayToHexString(payload, length).c_str());
+    //   RemoteScales::log("Unknown key %02X(%d) - %s\n", eventKey, eventKey, byteArrayToHexString(payload, length).c_str());
     // }
   }
   else {
-    RemoteScale::log("unknown event type %02x(%d): %s\n", eventType, eventType, byteArrayToHexString(payload, length).c_str());
+    RemoteScales::log("unknown event type %02x(%d): %s\n", eventType, eventType, byteArrayToHexString(payload, length).c_str());
   }
 }
 
-void AcaiaScale::handleScaleStatusPayload(const uint8_t* data, size_t length) {
+void AcaiaScales::handleScaleStatusPayload(const uint8_t* data, size_t length) {
   battery = data[1] & 0x7F;
   if (data[2] == 2) {
     weightUnits = "grams";
@@ -219,7 +219,7 @@ void AcaiaScale::handleScaleStatusPayload(const uint8_t* data, size_t length) {
   bool beep_on = (data[6] == 1);
 }
 
-float AcaiaScale::decodeWeight(const uint8_t* weightPayload) {
+float AcaiaScales::decodeWeight(const uint8_t* weightPayload) {
   float value = (weightPayload[1] << 8) | weightPayload[0];
   uint8_t scaling = weightPayload[4];
 
@@ -237,7 +237,7 @@ float AcaiaScale::decodeWeight(const uint8_t* weightPayload) {
     value /= 10000.0f;
     break;
   default:
-    RemoteScale::log("Invalid scaling %02X - %s \n", scaling, byteArrayToHexString(weightPayload, 6).c_str());
+    RemoteScales::log("Invalid scaling %02X - %s \n", scaling, byteArrayToHexString(weightPayload, 6).c_str());
     return -1;
   }
 
@@ -248,19 +248,19 @@ float AcaiaScale::decodeWeight(const uint8_t* weightPayload) {
   return value;
 }
 
-float AcaiaScale::decodeTime(const uint8_t* timePayload) {
+float AcaiaScales::decodeTime(const uint8_t* timePayload) {
   return timePayload[0] * 60.0f + timePayload[1] + timePayload[2] / 10.0f;
 }
 
-bool AcaiaScale::performConnectionHandshake() {
-  RemoteScale::log("Performing handshake\n");
+bool AcaiaScales::performConnectionHandshake() {
+  RemoteScales::log("Performing handshake\n");
 
   service = client->getService(serviceUUID);
   if (service == nullptr) {
     client->disconnect();
     return false;
   }
-  RemoteScale::log("Got Service\n");
+  RemoteScales::log("Got Service\n");
 
   weightCharacteristic = service->getCharacteristic(weightCharacteristicUUID);
   commandCharacteristic = service->getCharacteristic(commandCharacteristicUUID);
@@ -268,11 +268,11 @@ bool AcaiaScale::performConnectionHandshake() {
     client->disconnect();
     return false;
   }
-  RemoteScale::log("Got weightCharacteristic and commandCharacteristic\n");
+  RemoteScales::log("Got weightCharacteristic and commandCharacteristic\n");
 
   // Subscribe
   BLERemoteDescriptor* notifyDescriptor = weightCharacteristic->getDescriptor(BLEUUID((uint16_t)0x2902));
-  RemoteScale::log("Got notifyDescriptor\n");
+  RemoteScales::log("Got notifyDescriptor\n");
   if (notifyDescriptor != nullptr) {
     uint8_t value[2] = { 0x01, 0x00 };
     notifyDescriptor->writeValue(value, 2, true);
@@ -284,14 +284,14 @@ bool AcaiaScale::performConnectionHandshake() {
 
   // Identify
   sendId();
-  RemoteScale::log("Send ID\n");
+  RemoteScales::log("Send ID\n");
   sendNotificationRequest();
-  RemoteScale::log("Sent notification request\n");
+  RemoteScales::log("Sent notification request\n");
   lastHeartbeat = millis();
   return true;
 }
 
-void AcaiaScale::sendMessage(AcaiaMessageType msgType, const uint8_t* payload, size_t length, bool waitResponse) {
+void AcaiaScales::sendMessage(AcaiaMessageType msgType, const uint8_t* payload, size_t length, bool waitResponse) {
   size_t bufferSize = 5 + length;
   uint8_t* bytes = new uint8_t[bufferSize];
 
@@ -315,21 +315,21 @@ void AcaiaScale::sendMessage(AcaiaMessageType msgType, const uint8_t* payload, s
   bytes[length + 3] = (cksum1 & 0xFF);
   bytes[length + 4] = (cksum2 & 0xFF);
 
-  // RemoteScale::log("Sending: %s\n", byteArrayToHexString(bytes, bufferSize).c_str());
+  // RemoteScales::log("Sending: %s\n", byteArrayToHexString(bytes, bufferSize).c_str());
   commandCharacteristic->writeValue(bytes, bufferSize, waitResponse);
 };
 
-void AcaiaScale::sendId() {
+void AcaiaScales::sendId() {
   const uint8_t payload[] = { 0x2d,0x2d,0x2d,0x2d,0x2d,0x2d,0x2d,0x2d,0x2d,0x2d,0x2d,0x2d,0x2d,0x2d,0x2d };
   sendMessage(AcaiaMessageType::IDENTIFY, payload, 15, false);
 }
 
-void AcaiaScale::sendNotificationRequest() {
+void AcaiaScales::sendNotificationRequest() {
   uint8_t payload[] = { 0, 1, 1, 2, 2, 5, 3, 4 };
   sendEvent(payload, 8);
 }
 
-void AcaiaScale::sendEvent(const uint8_t* payload, size_t length) {
+void AcaiaScales::sendEvent(const uint8_t* payload, size_t length) {
   uint8_t* bytes = new uint8_t[length + 1];
   bytes[0] = static_cast<uint8_t>(length + 1);
 
@@ -341,7 +341,7 @@ void AcaiaScale::sendEvent(const uint8_t* payload, size_t length) {
   delete[] bytes;
 }
 
-void AcaiaScale::sendHeartbeat() {
+void AcaiaScales::sendHeartbeat() {
   if (!isConnected()) {
     return;
   }
@@ -359,20 +359,20 @@ void AcaiaScale::sendHeartbeat() {
   lastHeartbeat = now;
 }
 
-void AcaiaScale::subscribeToNotifications() {
-  RemoteScale::log("subscribeToNotifications\n");
+void AcaiaScales::subscribeToNotifications() {
+  RemoteScales::log("subscribeToNotifications\n");
 
   auto callback = [this](BLERemoteCharacteristic* characteristic, uint8_t* data, size_t length, bool isNotify) {
     notifyCallback(characteristic, data, length, isNotify);
   };
 
   if (weightCharacteristic->canNotify()) {
-    RemoteScale::log("Registering callback for weight characteristic\n");
+    RemoteScales::log("Registering callback for weight characteristic\n");
     weightCharacteristic->registerForNotify(callback);
   }
 
   if (commandCharacteristic->canNotify()) {
-    RemoteScale::log("Registering callback for command characteristic\n");
+    RemoteScales::log("Registering callback for command characteristic\n");
     commandCharacteristic->registerForNotify(callback);
   }
 }

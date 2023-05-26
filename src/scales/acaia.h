@@ -1,8 +1,8 @@
-#ifndef REMOTE_SCALE_ACAIA_H
-#define REMOTE_SCALE_ACAIA_H
+#ifndef REMOTE_SCALES_ACAIA_H
+#define REMOTE_SCALES_ACAIA_H
 
-#include "remote_scale.h"
-#include "remote_scale_plugin_registry.h"
+#include "remote_scales.h"
+#include "remote_scales_plugin_registry.h"
 #include <Arduino.h>
 #include <BLEDevice.h>
 #include <BLEUtils.h>
@@ -20,10 +20,10 @@ enum class AcaiaMessageType : uint8_t {
   EVENT = 12,
 };
 
-class AcaiaScale : public RemoteScale {
+class AcaiaScales : public RemoteScales {
 
 public:
-  AcaiaScale(BLEAdvertisedDevice device);
+  AcaiaScales(BLEAdvertisedDevice device);
   void update() override;
   bool connect() override;
   void disconnect() override;
@@ -82,12 +82,12 @@ private:
 class AcaiaScalesPlugin {
 public:
   static void apply() {
-    RemoteScalePlugin plugin = RemoteScalePlugin{
+    RemoteScalesPlugin plugin = RemoteScalesPlugin{
       .id = "plugin-acaia",
       .handles = [](BLEAdvertisedDevice device) { return AcaiaScalesPlugin::handles(device); },
-      .initialise = [](BLEAdvertisedDevice device) { return (RemoteScale*) new AcaiaScale(device); },
+      .initialise = [](BLEAdvertisedDevice device) { return (RemoteScales*) new AcaiaScales(device); },
     };
-    RemoteScalePluginRegistry::getInstance()->registerPlugin(plugin);
+    RemoteScalesPluginRegistry::getInstance()->registerPlugin(plugin);
   }
 private:
   static bool handles(BLEAdvertisedDevice device) {

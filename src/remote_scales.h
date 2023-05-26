@@ -1,15 +1,15 @@
-#ifndef REMOTE_SCALE_H
-#define REMOTE_SCALE_H
+#ifndef REMOTE_SCALES_H
+#define REMOTE_SCALES_H
 
 #include <BLEDevice.h>
 #include <Arduino.h>
 #include <vector>
 
-class RemoteScale {
+class RemoteScales {
 
 public:
   using WeightUpdatedCallback = void (*)(float);
-  RemoteScale(BLEAdvertisedDevice device) : device(device) {}
+  RemoteScales(BLEAdvertisedDevice device) : device(device) {}
 
   BLEAdvertisedDevice* getDevice() { return &device; }
   void setDebugPort(Stream* debugPort) { this->debugPort = debugPort; }
@@ -24,7 +24,7 @@ public:
   virtual void update() = 0;
   void log(const char* format, ...);
 
-  static RemoteScale* getInstance(BLEAdvertisedDevice device);
+  static RemoteScales* getInstance(BLEAdvertisedDevice device);
 
 private:
   BLEAdvertisedDevice device;
@@ -35,18 +35,18 @@ private:
 
 
 // ---------------------------------------------------------------------------------------
-// ---------------------------   RemoteScaleScanner    -----------------------------------
+// ---------------------------   RemoteScalesScanner    -----------------------------------
 // ---------------------------------------------------------------------------------------
 
-class RemoteScaleScanner : BLEAdvertisedDeviceCallbacks {
+class RemoteScalesScanner : BLEAdvertisedDeviceCallbacks {
 private:
-  std::vector<RemoteScale*> discoveredScales;
+  std::vector<RemoteScales*> discoveredScales;
   void cleanupDiscoveredScales();
   void onResult(BLEAdvertisedDevice advertisedDevice);
 
 public:
-  std::vector<RemoteScale*> getDiscoveredScales() { return discoveredScales; }
-  std::vector<RemoteScale*> syncScan(uint16_t timeout);
+  std::vector<RemoteScales*> getDiscoveredScales() { return discoveredScales; }
+  std::vector<RemoteScales*> syncScan(uint16_t timeout);
 
   void initializeAsyncScan();
   void stopAsyncScan();
