@@ -17,12 +17,22 @@ void RemoteScales::log(std::string msgFormat, ...) {
 }
 
 void RemoteScales::setWeight(float newWeight) {
-  if (weight != newWeight && weightCallback != nullptr) {
-    weight = newWeight;
-    weightCallback(newWeight);
+  float previousWeight = weight;
+  weight = newWeight;
+
+  if (weightCallback == nullptr) {
+    return;
   }
+  if (weightCallbackOnlyChanges && previousWeight == newWeight) {
+    return;
+  }
+  weightCallback(newWeight);
 }
 
+void RemoteScales::setWeightUpdatedCallback(void (*callback)(float), bool onlyChanges) {
+  weightCallbackOnlyChanges = onlyChanges;
+  this->weightCallback = callback;
+}
 
 // ---------------------------------------------------------------------------------------
 // ------------------------   RemoteScales methods    ------------------------------
@@ -49,8 +59,9 @@ void RemoteScalesScanner::restartAsyncScan() {
 }
 
 void RemoteScalesScanner::onResult(BLEAdvertisedDevice advertisedDevice) {
-  if (RemoteScalesPluginRegistry::getInstance()->containsPluginForDevice(advertisedDevice)) {
-    discoveredScales.push_back(RemoteScalesPluginRegistry::getInstance()->initialiseRemoteScales(advertisedDevice));
+  RemoteScales* newScales = RemoteScalesPluginRegistry::getInstance()->initialiseRemoteScales(advertisedDevice);
+  if (newScales != nullptr) {
+    discoveredScales.push_back(newScales);
   }
 }
 
@@ -71,11 +82,7 @@ std::vector<RemoteScales*> RemoteScalesScanner::syncScan(uint16_t timeout) {
 
   std::vector<RemoteScales*> scales;
   for (int i = 0; i < scanResults.getCount(); i++) {
-    RemoteScales* scale = RemoteScales::getInstance(scanResults.getDevice(i));
-
-    if (scale != nullptr) {
-      scales.push_back(scale);
-    }
+    onResult(scanResults.getDevice(i));
   }
 
   scanner->clearResults();
