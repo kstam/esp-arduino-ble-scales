@@ -70,7 +70,7 @@ void AcaiaScales::disconnect() {
   if (client.get() != nullptr && client->isConnected()) {
     RemoteScales::log("Disconnecting and cleaning up BLE client\n");
     client->disconnect();
-    client.release();
+    RemoteScales::log("Disconnected - BLE client\n");
   }
 }
 
@@ -144,6 +144,8 @@ void AcaiaScales::decodeAndHandleNotification(uint8_t* data, size_t length) {
     RemoteScales::log("Got info message: %s\n", byteArrayToHexString(data + messageStart, messageLength).c_str());
     // This normally means that something went wrong with the establishing a connection so we disconnect.
     disconnect();
+    delay(10);
+    connect();
   }
 
   RemoteScales::log("Unknown message type %02X: %s\n", messageType, byteArrayToHexString(data + messageStart, messageLength).c_str());
