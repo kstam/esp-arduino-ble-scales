@@ -70,7 +70,8 @@ void AcaiaScales::disconnect() {
   if (client.get() != nullptr && client->isConnected()) {
     RemoteScales::log("Disconnecting and cleaning up BLE client\n");
     client->disconnect();
-    RemoteScales::log("Disconnected - BLE client\n");
+    client.release();
+    RemoteScales::log("Disconnected\n");
   }
 }
 
@@ -79,7 +80,14 @@ bool AcaiaScales::isConnected() {
 }
 
 void AcaiaScales::update() {
-  sendHeartbeat();
+  if (markedForReconnection) {
+    RemoteScales::log("Marked for disconnection. Will attempt to reconnect.\n");
+    disconnect();
+    connect();
+    markedForReconnection = false;
+  } else {
+    sendHeartbeat();
+  }
 }
 
 bool AcaiaScales::tare() {
@@ -143,9 +151,7 @@ void AcaiaScales::decodeAndHandleNotification(uint8_t* data, size_t length) {
   if (messageType == AcaiaMessageType::INFO) {
     RemoteScales::log("Got info message: %s\n", byteArrayToHexString(data + messageStart, messageLength).c_str());
     // This normally means that something went wrong with the establishing a connection so we disconnect.
-    disconnect();
-    delay(10);
-    connect();
+    markedForReconnection = true;
   }
 
   RemoteScales::log("Unknown message type %02X: %s\n", messageType, byteArrayToHexString(data + messageStart, messageLength).c_str());

@@ -42,6 +42,8 @@ private:
 
   uint32_t lastHeartbeat = 0;
 
+  bool markedForReconnection = false;
+
   std::unique_ptr<BLEClient> client;
   BLERemoteService* service;
   BLERemoteCharacteristic* weightCharacteristic;
