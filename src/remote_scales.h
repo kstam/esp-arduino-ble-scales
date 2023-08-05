@@ -16,6 +16,9 @@ public:
   void setWeightUpdatedCallback(void (*callback)(float), bool onlyChanges = false);
   void setLogCallback(LogCallback logCallback) { this->logCallback = logCallback; }
 
+  std::string getDeviceName() { return device.getName(); }
+  std::string getDeviceAddress() { return device.getAddress().toString(); }
+
   virtual bool tare() = 0;
   virtual bool isConnected() = 0;
   virtual bool connect() = 0;
