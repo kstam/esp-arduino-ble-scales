@@ -50,6 +50,7 @@ private:
 
 class RemoteScalesScanner : BLEAdvertisedDeviceCallbacks {
 private:
+  bool isRunning = false;
   std::vector<RemoteScales*> discoveredScales;
   void cleanupDiscoveredScales();
   void onResult(BLEAdvertisedDevice advertisedDevice);
@@ -61,6 +62,7 @@ public:
   void initializeAsyncScan();
   void stopAsyncScan();
   void restartAsyncScan();
+  bool isScanRunning();
 };
 
 #endif

@@ -39,6 +39,7 @@ void RemoteScales::setWeightUpdatedCallback(void (*callback)(float), bool onlyCh
 // ---------------------------------------------------------------------------------------
 
 void RemoteScalesScanner::initializeAsyncScan() {
+  if (isRunning) return;
   cleanupDiscoveredScales();
 
   BLEDevice::getScan()->setAdvertisedDeviceCallbacks(this);
@@ -46,11 +47,14 @@ void RemoteScalesScanner::initializeAsyncScan() {
   BLEDevice::getScan()->setWindow(100);
   BLEDevice::getScan()->setActiveScan(false);
   BLEDevice::getScan()->start(0, [](BLEScanResults) {}); // Set to 0 for continuous
+  isRunning = true;
 }
 
 void RemoteScalesScanner::stopAsyncScan() {
+  if (!isRunning) return;
   BLEDevice::getScan()->stop();
   BLEDevice::getScan()->clearResults();
+  isRunning = false;
 }
 
 void RemoteScalesScanner::restartAsyncScan() {
@@ -74,6 +78,7 @@ void RemoteScalesScanner::cleanupDiscoveredScales() {
 
 std::vector<RemoteScales*> RemoteScalesScanner::syncScan(uint16_t timeout) {
   BLEScan* scanner = BLEDevice::getScan();
+  isRunning = true;
   scanner->setActiveScan(true);
   scanner->setInterval(100);
   scanner->setWindow(99);
@@ -88,5 +93,10 @@ std::vector<RemoteScales*> RemoteScalesScanner::syncScan(uint16_t timeout) {
   scanner->clearResults();
   scanner->setActiveScan(false);
 
+  isRunning = false;
   return scales;
+}
+
+bool RemoteScalesScanner::isScanRunning() {
+  return isRunning;
 }
