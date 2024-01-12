@@ -52,7 +52,7 @@ bool AcaiaScales::connect() {
   RemoteScales::log("Connecting to %s[%s]\n", RemoteScales::getDevice()->getName().c_str(), RemoteScales::getDevice()->getAddress().toString().c_str());
   bool result = client->connect(RemoteScales::getDevice());
   if (!result) {
-    client.release();
+    client.reset();
     return false;
   }
 
@@ -70,7 +70,7 @@ void AcaiaScales::disconnect() {
   if (client.get() != nullptr && client->isConnected()) {
     RemoteScales::log("Disconnecting and cleaning up BLE client\n");
     client->disconnect();
-    client.release();
+    client.reset();
     RemoteScales::log("Disconnected\n");
   }
 }
@@ -266,6 +266,7 @@ bool AcaiaScales::performConnectionHandshake() {
   service = client->getService(serviceUUID);
   if (service == nullptr) {
     client->disconnect();
+    client.reset();
     return false;
   }
   RemoteScales::log("Got Service\n");
@@ -274,6 +275,7 @@ bool AcaiaScales::performConnectionHandshake() {
   commandCharacteristic = service->getCharacteristic(commandCharacteristicUUID);
   if (weightCharacteristic == nullptr || commandCharacteristic == nullptr) {
     client->disconnect();
+    client.reset();
     return false;
   }
   RemoteScales::log("Got weightCharacteristic and commandCharacteristic\n");
@@ -287,6 +289,7 @@ bool AcaiaScales::performConnectionHandshake() {
   }
   else {
     client->disconnect();
+    client.reset();
     return false;
   }
 
