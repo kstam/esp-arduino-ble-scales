@@ -44,18 +44,19 @@ std::string byteArrayToHexString(const uint8_t* byteArray, size_t length) {
 AcaiaScales::AcaiaScales(BLEAdvertisedDevice device) : RemoteScales(device) {}
 
 bool AcaiaScales::connect() {
-  if (RemoteScales::clientIsConnected()) {
+  if (client.get() != nullptr && client->isConnected()) {
     return true;
   }
 
-  RemoteScales::log("Connecting to %s[%s]\n", RemoteScales::getDevice().getName().c_str(), RemoteScales::getDevice().getAddress().toString().c_str());
-  bool result = RemoteScales::clientConnect();
+  client.reset(BLEDevice::createClient());
+  RemoteScales::log("Connecting to %s[%s]\n", RemoteScales::getDevice()->getName().c_str(), RemoteScales::getDevice()->getAddress().toString().c_str());
+  bool result = client->connect(RemoteScales::getDevice());
   if (!result) {
-    RemoteScales::clientCleanup();
+    client.reset();
     return false;
   }
 
-  RemoteScales::clientSetMTU(247);
+  client->setMTU(247);
 
   if (!performConnectionHandshake()) {
     return false;
@@ -66,17 +67,22 @@ bool AcaiaScales::connect() {
 }
 
 void AcaiaScales::disconnect() {
-  RemoteScales::clientCleanup();
+  if (client.get() != nullptr && client->isConnected()) {
+    RemoteScales::log("Disconnecting and cleaning up BLE client\n");
+    client->disconnect();
+    client.reset();
+    RemoteScales::log("Disconnected\n");
+  }
 }
 
 bool AcaiaScales::isConnected() {
-  return RemoteScales::clientIsConnected();
+  return client != nullptr && client->isConnected();
 }
 
 void AcaiaScales::update() {
   if (markedForReconnection) {
     RemoteScales::log("Marked for disconnection. Will attempt to reconnect.\n");
-    RemoteScales::clientCleanup();
+    disconnect();
     connect();
     markedForReconnection = false;
   } else {
@@ -257,9 +263,10 @@ float AcaiaScales::decodeTime(const uint8_t* timePayload) {
 bool AcaiaScales::performConnectionHandshake() {
   RemoteScales::log("Performing handshake\n");
 
-  service = RemoteScales::clientGetService(serviceUUID);
+  service = client->getService(serviceUUID);
   if (service == nullptr) {
-    clientCleanup();
+    client->disconnect();
+    client.reset();
     return false;
   }
   RemoteScales::log("Got Service\n");
@@ -267,7 +274,8 @@ bool AcaiaScales::performConnectionHandshake() {
   weightCharacteristic = service->getCharacteristic(weightCharacteristicUUID);
   commandCharacteristic = service->getCharacteristic(commandCharacteristicUUID);
   if (weightCharacteristic == nullptr || commandCharacteristic == nullptr) {
-    clientCleanup();
+    client->disconnect();
+    client.reset();
     return false;
   }
   RemoteScales::log("Got weightCharacteristic and commandCharacteristic\n");
@@ -280,7 +288,8 @@ bool AcaiaScales::performConnectionHandshake() {
     notifyDescriptor->writeValue(value, 2, true);
   }
   else {
-    clientCleanup();
+    client->disconnect();
+    client.reset();
     return false;
   }
 

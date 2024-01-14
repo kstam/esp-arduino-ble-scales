@@ -1,13 +1,15 @@
-#pragma once
+#ifndef REMOTE_SCALES_H
+#define REMOTE_SCALES_H
+
 #include <BLEDevice.h>
 #include <Arduino.h>
 #include <vector>
-#include <memory>
 
 class RemoteScales {
 
 public:
   using LogCallback = void (*)(std::string);
+  RemoteScales(BLEAdvertisedDevice device) : device(device) {}
 
   float getWeight() { return weight; }
 
@@ -24,28 +26,18 @@ public:
   virtual void update() = 0;
 
 protected:
-  RemoteScales(BLEAdvertisedDevice device);
-  BLEAdvertisedDevice& getDevice() { return device; }
-
-  bool clientConnect();
-  void clientCleanup();
-  bool clientIsConnected();
-  BLERemoteService* clientGetService(const BLEUUID uuid);
-  
-  void clientSetMTU(uint16_t mtu);
+  BLEAdvertisedDevice* getDevice() { return &device; }
 
   void setWeight(float newWeight);
   void log(std::string msgFormat, ...);
 
 private:
-
   using WeightCallback = void (*)(float);
 
   float weight = 0.f;
 
   BLEAdvertisedDevice device;
 
-  std::unique_ptr<BLEClient> client;
   LogCallback logCallback;
   WeightCallback weightCallback;
   bool weightCallbackOnlyChanges = false;
@@ -55,16 +47,17 @@ private:
 // ---------------------------------------------------------------------------------------
 // ---------------------------   RemoteScalesScanner    -----------------------------------
 // ---------------------------------------------------------------------------------------
+
 class RemoteScalesScanner : BLEAdvertisedDeviceCallbacks {
 private:
   bool isRunning = false;
-  std::vector<BLEAdvertisedDevice> discoveredScales;
+  std::vector<RemoteScales*> discoveredScales;
   void cleanupDiscoveredScales();
   void onResult(BLEAdvertisedDevice advertisedDevice);
 
 public:
-  std::vector<BLEAdvertisedDevice> getDiscoveredScales() { return discoveredScales; }
-  std::vector<BLEAdvertisedDevice> syncScan(uint16_t timeout);
+  std::vector<RemoteScales*> getDiscoveredScales() { return discoveredScales; }
+  std::vector<RemoteScales*> syncScan(uint16_t timeout);
 
   void initializeAsyncScan();
   void stopAsyncScan();
@@ -72,26 +65,4 @@ public:
   bool isScanRunning();
 };
 
-// ---------------------------------------------------------------------------------------
-// ---------------------------   RemoteScalesFactory    ----------------------------------
-// ---------------------------------------------------------------------------------------
-
-// This is a singleton class that is used to create RemoteScales objects from BLEAdvertisedDevice objects.
-class RemoteScalesFactory {
-public:
-  std::unique_ptr<RemoteScales> create(const BLEAdvertisedDevice& device);
-
-  static RemoteScalesFactory* getInstance() {
-    if (instance == nullptr) {
-      instance = new RemoteScalesFactory();
-    }
-    return instance;
-  }
-
-  RemoteScalesFactory(RemoteScalesFactory& other) = delete;
-  void operator=(const RemoteScalesFactory&) = delete;
-
-private:
-  static RemoteScalesFactory* instance;
-  RemoteScalesFactory() {}  // Private constructor to enforce singleton
-};
+#endif

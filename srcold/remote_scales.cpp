@@ -5,8 +5,6 @@
 // ------------------------   Common RemoteScales methods    ------------------------------
 // ---------------------------------------------------------------------------------------
 
-RemoteScales::RemoteScales(BLEAdvertisedDevice device) : device(device) {}
-
 void RemoteScales::log(std::string msgFormat, ...) {
   if (!this->logCallback) return;
   va_list args;
@@ -36,36 +34,6 @@ void RemoteScales::setWeightUpdatedCallback(void (*callback)(float), bool onlyCh
   this->weightCallback = callback;
 }
 
-bool RemoteScales::clientConnect() {
-  clientCleanup();
-  log("Connecting to BLE client\n");
-  client.reset(BLEDevice::createClient());
-  return client->connect(&device);
-}
-
-void RemoteScales::clientCleanup() {
-  if (client) {
-    if (client->isConnected()) {
-      log("Disconnecting from BLE client\n");
-      client->disconnect();
-    }
-    log("Cleaning up BLE client\n");
-    client.reset();
-  }
-}
-
-BLERemoteService* RemoteScales::clientGetService(const BLEUUID uuid) {
-  if (!clientIsConnected()) {
-    log("Cannot get service, client is not connected\n");
-    return nullptr;
-  }
-  return client->getService(uuid);
-}
-
-bool RemoteScales::clientIsConnected() { return client && client->isConnected(); };
-
-void RemoteScales::clientSetMTU(uint16_t mtu) { client->setMTU(mtu); };
-
 // ---------------------------------------------------------------------------------------
 // ------------------------   RemoteScales methods    ------------------------------
 // ---------------------------------------------------------------------------------------
@@ -94,17 +62,21 @@ void RemoteScalesScanner::restartAsyncScan() {
   initializeAsyncScan();
 }
 
-void RemoteScalesScanner::onResult(BLEAdvertisedDevice device) {
-  if (RemoteScalesPluginRegistry::getInstance()->containsPluginForDevice(device)) {
-    discoveredScales.push_back(device);
+void RemoteScalesScanner::onResult(BLEAdvertisedDevice advertisedDevice) {
+  RemoteScales* newScales = RemoteScalesPluginRegistry::getInstance()->initialiseRemoteScales(advertisedDevice);
+  if (newScales != nullptr) {
+    discoveredScales.push_back(newScales);
   }
 }
 
 void RemoteScalesScanner::cleanupDiscoveredScales() {
+  for (const auto& scale : discoveredScales) {
+    delete scale;
+  }
   discoveredScales.clear();
 }
 
-std::vector<BLEAdvertisedDevice> RemoteScalesScanner::syncScan(uint16_t timeout) {
+std::vector<RemoteScales*> RemoteScalesScanner::syncScan(uint16_t timeout) {
   BLEScan* scanner = BLEDevice::getScan();
   isRunning = true;
   scanner->setActiveScan(true);
@@ -113,7 +85,7 @@ std::vector<BLEAdvertisedDevice> RemoteScalesScanner::syncScan(uint16_t timeout)
 
   BLEScanResults scanResults = scanner->start(timeout, false);
 
-  cleanupDiscoveredScales();
+  std::vector<RemoteScales*> scales;
   for (int i = 0; i < scanResults.getCount(); i++) {
     onResult(scanResults.getDevice(i));
   }
@@ -122,21 +94,9 @@ std::vector<BLEAdvertisedDevice> RemoteScalesScanner::syncScan(uint16_t timeout)
   scanner->setActiveScan(false);
 
   isRunning = false;
-  return discoveredScales;
+  return scales;
 }
 
 bool RemoteScalesScanner::isScanRunning() {
   return isRunning;
-}
-
-// ---------------------------------------------------------------------------------------
-// ------------------------   RemoteScalesFactory methods    -----------------------------
-// ---------------------------------------------------------------------------------------
-RemoteScalesFactory* RemoteScalesFactory::instance = nullptr;
-
-std::unique_ptr<RemoteScales> RemoteScalesFactory::create(const BLEAdvertisedDevice& device) {
-  if (!RemoteScalesPluginRegistry::getInstance()->containsPluginForDevice(device)) {
-    return nullptr;
-  }
-  return RemoteScalesPluginRegistry::getInstance()->initialiseRemoteScales(device);
 }

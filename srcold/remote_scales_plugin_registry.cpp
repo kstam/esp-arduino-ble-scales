@@ -25,7 +25,7 @@ bool RemoteScalesPluginRegistry::containsPluginForDevice(BLEAdvertisedDevice dev
   return false;
 }
 
-std::unique_ptr<RemoteScales> RemoteScalesPluginRegistry::initialiseRemoteScales(BLEAdvertisedDevice device) {
+RemoteScales* RemoteScalesPluginRegistry::initialiseRemoteScales(BLEAdvertisedDevice device) {
   for (const auto& plugin : plugins) {
     if (plugin.handles(device)) {
       return plugin.initialise(device);

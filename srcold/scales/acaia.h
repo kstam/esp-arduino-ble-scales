@@ -1,4 +1,6 @@
-#pragma once
+#ifndef REMOTE_SCALES_ACAIA_H
+#define REMOTE_SCALES_ACAIA_H
+
 #include "remote_scales.h"
 #include "remote_scales_plugin_registry.h"
 #include <Arduino.h>
@@ -42,6 +44,7 @@ private:
 
   bool markedForReconnection = false;
 
+  std::unique_ptr<BLEClient> client;
   BLERemoteService* service;
   BLERemoteCharacteristic* weightCharacteristic;
   BLERemoteCharacteristic* commandCharacteristic;
@@ -84,13 +87,13 @@ public:
     RemoteScalesPlugin plugin = RemoteScalesPlugin{
       .id = "plugin-acaia",
       .handles = [](BLEAdvertisedDevice device) { return AcaiaScalesPlugin::handles(device); },
-      .initialise = [](const BLEAdvertisedDevice& device) -> std::unique_ptr<RemoteScales> { return std::make_unique<AcaiaScales>(device); },
+      .initialise = [](BLEAdvertisedDevice device) { return (RemoteScales*) new AcaiaScales(device); },
     };
     RemoteScalesPluginRegistry::getInstance()->registerPlugin(plugin);
   }
 private:
   static bool handles(BLEAdvertisedDevice device) {
-    const std::string& deviceName = device.getName();
+    std::string deviceName = device.getName();
     return !deviceName.empty() && (
       deviceName.find("ACAIA") == 0
       || deviceName.find("PYXIS") == 0
@@ -98,3 +101,4 @@ private:
       || deviceName.find("PROCH") == 0);
   }
 };
+#endif
