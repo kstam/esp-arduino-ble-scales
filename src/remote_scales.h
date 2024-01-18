@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include <vector>
 #include <memory>
-
+#include <lru_cache.h>
 class RemoteScales {
 
 public:
@@ -58,6 +58,7 @@ private:
 class RemoteScalesScanner : BLEAdvertisedDeviceCallbacks {
 private:
   bool isRunning = false;
+  LRUCache alreadySeenAddresses = LRUCache(100);
   std::vector<BLEAdvertisedDevice> discoveredScales;
   void cleanupDiscoveredScales();
   void onResult(BLEAdvertisedDevice advertisedDevice);

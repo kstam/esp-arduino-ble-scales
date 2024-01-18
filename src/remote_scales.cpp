@@ -74,11 +74,14 @@ void RemoteScalesScanner::initializeAsyncScan() {
   if (isRunning) return;
   cleanupDiscoveredScales();
 
-  BLEDevice::getScan()->setAdvertisedDeviceCallbacks(this);
-  BLEDevice::getScan()->setInterval(200);
+  // We set the second parameter to true to prevent the library from storing BLEAdvertisedDevice objects
+  // for devices we're not interested in. This is important because the library will otherwise run out of
+  // memory after a while.
+  BLEDevice::getScan()->setAdvertisedDeviceCallbacks(this, true);
+  BLEDevice::getScan()->setInterval(500);
   BLEDevice::getScan()->setWindow(100);
   BLEDevice::getScan()->setActiveScan(false);
-  BLEDevice::getScan()->start(0, [](BLEScanResults) {}); // Set to 0 for continuous
+  BLEDevice::getScan()->start(0, nullptr); // Set to 0 for continuous
   isRunning = true;
 }
 
@@ -95,6 +98,10 @@ void RemoteScalesScanner::restartAsyncScan() {
 }
 
 void RemoteScalesScanner::onResult(BLEAdvertisedDevice device) {
+  std::string addrStr(reinterpret_cast<const char*>(device.getAddress().getNative()), 6);
+  if (alreadySeenAddresses.checkAndUpdate(addrStr)) {
+    return;
+  }
   if (RemoteScalesPluginRegistry::getInstance()->containsPluginForDevice(device)) {
     discoveredScales.push_back(device);
   }
