@@ -99,7 +99,7 @@ void RemoteScalesScanner::restartAsyncScan() {
 
 void RemoteScalesScanner::onResult(BLEAdvertisedDevice device) {
   std::string addrStr(reinterpret_cast<const char*>(device.getAddress().getNative()), 6);
-  if (alreadySeenAddresses.checkAndUpdate(addrStr)) {
+  if (alreadySeenAddresses.exists(addrStr)) {
     return;
   }
   if (RemoteScalesPluginRegistry::getInstance()->containsPluginForDevice(device)) {
