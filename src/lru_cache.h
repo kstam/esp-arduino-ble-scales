@@ -28,6 +28,11 @@ public:
     return false;
   }
 
+  void cleanup() {
+    cacheMap.clear();
+    usageList.clear();
+  }
+
 private:
   size_t capacity;
   std::list<std::string> usageList; // Doubly-linked list of device IDs

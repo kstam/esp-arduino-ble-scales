@@ -2,8 +2,8 @@
 #include "remote_scales.h"
 
 struct RemoteScalesPlugin {
-  using RemoteScalesFilter = bool (*)(BLEAdvertisedDevice device);
-  using RemoteScalesInitialiser = std::unique_ptr<RemoteScales> (*)(const BLEAdvertisedDevice& device);
+  using RemoteScalesFilter = bool (*)(const DiscoveredDevice& device);
+  using RemoteScalesInitialiser = std::unique_ptr<RemoteScales> (*)(const DiscoveredDevice& device);
   std::string id;
   RemoteScalesFilter handles;
   RemoteScalesInitialiser initialise;
@@ -22,8 +22,8 @@ public:
   void operator=(const RemoteScalesPluginRegistry&) = delete;
 
   void registerPlugin(RemoteScalesPlugin plugin);
-  bool containsPluginForDevice(BLEAdvertisedDevice device);
-  std::unique_ptr<RemoteScales> initialiseRemoteScales(BLEAdvertisedDevice device);
+  bool containsPluginForDevice(const DiscoveredDevice& device);
+  std::unique_ptr<RemoteScales> initialiseRemoteScales(const DiscoveredDevice& device);
 
 private:
   static RemoteScalesPluginRegistry* instance;

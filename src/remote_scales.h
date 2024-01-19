@@ -1,21 +1,36 @@
 #pragma once
-#include <BLEDevice.h>
+#include <NimBLEDevice.h>
 #include <Arduino.h>
 #include <vector>
 #include <memory>
 #include <lru_cache.h>
+
+
+class DiscoveredDevice {
+public:
+  DiscoveredDevice(NimBLEAdvertisedDevice* device) : 
+  name(device->getName()), address(device->getAddress()), manufacturerData(device->getManufacturerData()) {}
+  const std::string& getName() const { return name; }
+  const NimBLEAddress& getAddress() const { return address; }
+  const std::string& getManufacturerData() const { return manufacturerData; }
+private:
+  std::string name;
+  std::string manufacturerData;
+  NimBLEAddress address;
+};
+
 class RemoteScales {
 
 public:
   using LogCallback = void (*)(std::string);
 
-  float getWeight() { return weight; }
+  float getWeight() const { return weight; }
 
   void setWeightUpdatedCallback(void (*callback)(float), bool onlyChanges = false);
   void setLogCallback(LogCallback logCallback) { this->logCallback = logCallback; }
 
-  std::string getDeviceName() { return device.getName(); }
-  std::string getDeviceAddress() { return device.getAddress().toString(); }
+  const std::string& getDeviceName() const { return device.getName(); }
+  const std::string& getDeviceAddress() const { return device.getAddress().toString(); }
 
   virtual bool tare() = 0;
   virtual bool isConnected() = 0;
@@ -24,48 +39,44 @@ public:
   virtual void update() = 0;
 
 protected:
-  RemoteScales(BLEAdvertisedDevice device);
-  BLEAdvertisedDevice& getDevice() { return device; }
+  RemoteScales(const DiscoveredDevice& device);
+  ~RemoteScales() { clientCleanup(); }
+  const DiscoveredDevice& getDevice() const { return device; }
 
   bool clientConnect();
   void clientCleanup();
   bool clientIsConnected();
-  BLERemoteService* clientGetService(const BLEUUID uuid);
+  NimBLERemoteService* clientGetService(const NimBLEUUID uuid);
   
-  void clientSetMTU(uint16_t mtu);
-
   void setWeight(float newWeight);
   void log(std::string msgFormat, ...);
 
 private:
-
   using WeightCallback = void (*)(float);
 
   float weight = 0.f;
 
-  BLEAdvertisedDevice device;
-
-  std::unique_ptr<BLEClient> client;
+  NimBLEClient* client;
+  DiscoveredDevice device;
   LogCallback logCallback;
   WeightCallback weightCallback;
   bool weightCallbackOnlyChanges = false;
 };
 
-
 // ---------------------------------------------------------------------------------------
 // ---------------------------   RemoteScalesScanner    -----------------------------------
 // ---------------------------------------------------------------------------------------
-class RemoteScalesScanner : BLEAdvertisedDeviceCallbacks {
+class RemoteScalesScanner : public NimBLEAdvertisedDeviceCallbacks {
 private:
   bool isRunning = false;
   LRUCache alreadySeenAddresses = LRUCache(100);
-  std::vector<BLEAdvertisedDevice> discoveredScales;
+  std::vector<DiscoveredDevice> discoveredScales;
   void cleanupDiscoveredScales();
-  void onResult(BLEAdvertisedDevice advertisedDevice);
+  void onResult(NimBLEAdvertisedDevice* advertisedDevice);
 
 public:
-  std::vector<BLEAdvertisedDevice> getDiscoveredScales() { return discoveredScales; }
-  std::vector<BLEAdvertisedDevice> syncScan(uint16_t timeout);
+  std::vector<DiscoveredDevice> getDiscoveredScales() { return discoveredScales; }
+  // std::vector<NimBLEAdvertisedDevice*> syncScan(uint16_t timeout);
 
   void initializeAsyncScan();
   void stopAsyncScan();
@@ -80,7 +91,7 @@ public:
 // This is a singleton class that is used to create RemoteScales objects from BLEAdvertisedDevice objects.
 class RemoteScalesFactory {
 public:
-  std::unique_ptr<RemoteScales> create(const BLEAdvertisedDevice& device);
+  std::unique_ptr<RemoteScales> create(DiscoveredDevice device);
 
   static RemoteScalesFactory* getInstance() {
     if (instance == nullptr) {

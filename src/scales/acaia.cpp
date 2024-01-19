@@ -21,9 +21,9 @@ enum class AcaiaEventKey : uint8_t {
   STOP = 9,
 };
 
-const BLEUUID serviceUUID("49535343-fe7d-4ae5-8fa9-9fafd205e455");
-const BLEUUID weightCharacteristicUUID("49535343-1e4d-4bd9-ba61-23c647249616");
-const BLEUUID commandCharacteristicUUID("49535343-8841-43f4-a8d4-ecbe34729bb3");
+const NimBLEUUID serviceUUID("49535343-fe7d-4ae5-8fa9-9fafd205e455");
+const NimBLEUUID weightCharacteristicUUID("49535343-1e4d-4bd9-ba61-23c647249616");
+const NimBLEUUID commandCharacteristicUUID("49535343-8841-43f4-a8d4-ecbe34729bb3");
 
 std::string byteArrayToHexString(const uint8_t* byteArray, size_t length) {
   std::string hexString;
@@ -41,21 +41,21 @@ std::string byteArrayToHexString(const uint8_t* byteArray, size_t length) {
 //-----------------------------------------------------------------------------------/
 //---------------------------        PUBLIC       -----------------------------------/
 //-----------------------------------------------------------------------------------/
-AcaiaScales::AcaiaScales(BLEAdvertisedDevice device) : RemoteScales(device) {}
+AcaiaScales::AcaiaScales(NimBLEAdvertisedDevice* device) : RemoteScales(device) {}
 
 bool AcaiaScales::connect() {
   if (RemoteScales::clientIsConnected()) {
     return true;
   }
 
-  RemoteScales::log("Connecting to %s[%s]\n", RemoteScales::getDevice().getName().c_str(), RemoteScales::getDevice().getAddress().toString().c_str());
+  RemoteScales::log("Connecting to %s[%s]\n", RemoteScales::getDeviceName().c_str(), RemoteScales::getDeviceAddress().c_str());
   bool result = RemoteScales::clientConnect();
   if (!result) {
     RemoteScales::clientCleanup();
     return false;
   }
 
-  RemoteScales::clientSetMTU(247);
+  // RemoteScales::clientSetMTU(247);
 
   if (!performConnectionHandshake()) {
     return false;
@@ -95,7 +95,7 @@ bool AcaiaScales::tare() {
 //---------------------------       PRIVATE       -----------------------------------/
 //-----------------------------------------------------------------------------------/
 void AcaiaScales::notifyCallback(
-  BLERemoteCharacteristic* pBLERemoteCharacteristic,
+  NimBLERemoteCharacteristic* pBLERemoteCharacteristic,
   uint8_t* pData,
   size_t length,
   bool isNotify
@@ -273,7 +273,7 @@ bool AcaiaScales::performConnectionHandshake() {
   RemoteScales::log("Got weightCharacteristic and commandCharacteristic\n");
 
   // Subscribe
-  BLERemoteDescriptor* notifyDescriptor = weightCharacteristic->getDescriptor(BLEUUID((uint16_t)0x2902));
+  NimBLERemoteDescriptor* notifyDescriptor = weightCharacteristic->getDescriptor(NimBLEUUID((uint16_t)0x2902));
   RemoteScales::log("Got notifyDescriptor\n");
   if (notifyDescriptor != nullptr) {
     uint8_t value[2] = { 0x01, 0x00 };
@@ -364,7 +364,7 @@ void AcaiaScales::sendHeartbeat() {
 void AcaiaScales::subscribeToNotifications() {
   RemoteScales::log("subscribeToNotifications\n");
 
-  auto callback = [this](BLERemoteCharacteristic* characteristic, uint8_t* data, size_t length, bool isNotify) {
+  auto callback = [this](NimBLERemoteCharacteristic* characteristic, uint8_t* data, size_t length, bool isNotify) {
     notifyCallback(characteristic, data, length, isNotify);
   };
 

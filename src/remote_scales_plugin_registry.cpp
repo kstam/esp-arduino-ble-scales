@@ -16,7 +16,7 @@ void RemoteScalesPluginRegistry::registerPlugin(RemoteScalesPlugin plugin) {
   plugins.push_back(plugin);
 }
 
-bool RemoteScalesPluginRegistry::containsPluginForDevice(BLEAdvertisedDevice device) {
+bool RemoteScalesPluginRegistry::containsPluginForDevice(const DiscoveredDevice& device) {
   for (const auto& plugin : plugins) {
     if (plugin.handles(device)) {
       return true;
@@ -25,7 +25,7 @@ bool RemoteScalesPluginRegistry::containsPluginForDevice(BLEAdvertisedDevice dev
   return false;
 }
 
-std::unique_ptr<RemoteScales> RemoteScalesPluginRegistry::initialiseRemoteScales(BLEAdvertisedDevice device) {
+std::unique_ptr<RemoteScales> RemoteScalesPluginRegistry::initialiseRemoteScales(const DiscoveredDevice& device) {
   for (const auto& plugin : plugins) {
     if (plugin.handles(device)) {
       return plugin.initialise(device);

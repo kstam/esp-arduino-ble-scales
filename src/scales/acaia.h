@@ -2,9 +2,9 @@
 #include "remote_scales.h"
 #include "remote_scales_plugin_registry.h"
 #include <Arduino.h>
-#include <BLEDevice.h>
-#include <BLEUtils.h>
-#include <BLEScan.h>
+#include <NimBLEDevice.h>
+#include <NimBLEUtils.h>
+#include <NimBLEScan.h>
 #include <vector>
 #include <memory>
 
@@ -21,7 +21,7 @@ enum class AcaiaMessageType : uint8_t {
 class AcaiaScales : public RemoteScales {
 
 public:
-  AcaiaScales(BLEAdvertisedDevice device);
+  AcaiaScales(NimBLEAdvertisedDevice* device);
   void update() override;
   bool connect() override;
   void disconnect() override;
@@ -42,9 +42,9 @@ private:
 
   bool markedForReconnection = false;
 
-  BLERemoteService* service;
-  BLERemoteCharacteristic* weightCharacteristic;
-  BLERemoteCharacteristic* commandCharacteristic;
+  NimBLERemoteService* service;
+  NimBLERemoteCharacteristic* weightCharacteristic;
+  NimBLERemoteCharacteristic* commandCharacteristic;
 
   bool performConnectionHandshake();
   void subscribeToNotifications();
@@ -57,7 +57,7 @@ private:
   void sendId();
   void sendTare();
   void sendTimerCommand(uint8_t command);
-  void notifyCallback(BLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify);
+  void notifyCallback(NimBLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify);
   void decodeAndHandleNotification(uint8_t* pData, size_t length);
   void handleScaleEventPayload(const uint8_t* pData, size_t length);
   void handleScaleStatusPayload(const uint8_t* pData, size_t length);
@@ -83,13 +83,13 @@ public:
   static void apply() {
     RemoteScalesPlugin plugin = RemoteScalesPlugin{
       .id = "plugin-acaia",
-      .handles = [](BLEAdvertisedDevice device) { return AcaiaScalesPlugin::handles(device); },
-      .initialise = [](const BLEAdvertisedDevice& device) -> std::unique_ptr<RemoteScales> { return std::make_unique<AcaiaScales>(device); },
+      .handles = [](const DiscoveredDevice& device) { return AcaiaScalesPlugin::handles(device); },
+      .initialise = [](const DiscoveredDevice& device) -> std::unique_ptr<RemoteScales> { return std::make_unique<AcaiaScales>(device); },
     };
     RemoteScalesPluginRegistry::getInstance()->registerPlugin(plugin);
   }
 private:
-  static bool handles(BLEAdvertisedDevice device) {
+  static bool handles(const DiscoveredDevice& device) {
     const std::string& deviceName = device.getName();
     return !deviceName.empty() && (
       deviceName.find("ACAIA") == 0
