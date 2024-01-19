@@ -9,9 +9,13 @@ RemoteScales::RemoteScales(const DiscoveredDevice& device) : device(device) {}
 
 void RemoteScales::log(std::string msgFormat, ...) {
   if (!this->logCallback) return;
+  
   va_list args;
   va_start(args, msgFormat);
   int length = vsnprintf(nullptr, 0, msgFormat.c_str(), args); // Find length of string
+  va_end(args); // End before restarting
+
+  va_start(args, msgFormat); // Restart for the actual printing
   std::string formattedMessage(length, '\0'); // Instantiate formatted strigng with correct length
   vsnprintf(&formattedMessage[0], length + 1, msgFormat.c_str(), args); // print formatted message in the string
   va_end(args);
@@ -39,17 +43,13 @@ void RemoteScales::setWeightUpdatedCallback(void (*callback)(float), bool onlyCh
 bool RemoteScales::clientConnect() {
   clientCleanup();
   log("Connecting to BLE client\n");
-  client = NimBLEDevice::createClient();
-  return client->connect(&device);
+  client = NimBLEDevice::createClient(device.getAddress());
+  return client->connect();
 }
 
 void RemoteScales::clientCleanup() {
   if (client == nullptr) {
     return;
-  }
-  if (client->isConnected()) {
-    log("Disconnecting from BLE client\n");
-    client->disconnect();
   }
   log("Cleaning up BLE client\n");
   NimBLEDevice::deleteClient(client);
@@ -63,9 +63,7 @@ NimBLERemoteService* RemoteScales::clientGetService(const NimBLEUUID uuid) {
   return client->getService(uuid);
 }
 
-bool RemoteScales::clientIsConnected() { return client && client->isConnected(); };
-
-// void RemoteScales::clientSetMTU(uint16_t mtu) { client->setConnectionParams(mtu); };
+bool RemoteScales::clientIsConnected() { return client != nullptr && client->isConnected(); };
 
 // ---------------------------------------------------------------------------------------
 // ------------------------   RemoteScales methods    ------------------------------
@@ -79,10 +77,12 @@ void RemoteScalesScanner::initializeAsyncScan() {
   // for devices we're not interested in. This is important because the library will otherwise run out of
   // memory after a while.
   NimBLEDevice::getScan()->setAdvertisedDeviceCallbacks(this, true);
-  NimBLEDevice::getScan()->setInterval(500);
+  NimBLEDevice::getScan()->setInterval(1000);
   NimBLEDevice::getScan()->setWindow(100);
+  NimBLEDevice::getScan()->setMaxResults(0);
+  NimBLEDevice::getScan()->setDuplicateFilter(false);
   NimBLEDevice::getScan()->setActiveScan(false);
-  NimBLEDevice::getScan()->start(0, nullptr); // Set to 0 for continuous
+  NimBLEDevice::getScan()->start(0, nullptr, false); // Set to 0 for continuous
   isRunning = true;
 }
 

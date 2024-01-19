@@ -29,8 +29,8 @@ public:
   void setWeightUpdatedCallback(void (*callback)(float), bool onlyChanges = false);
   void setLogCallback(LogCallback logCallback) { this->logCallback = logCallback; }
 
-  const std::string& getDeviceName() const { return device.getName(); }
-  const std::string& getDeviceAddress() const { return device.getAddress().toString(); }
+  std::string getDeviceName() const { return device.getName(); }
+  std::string getDeviceAddress() const { return device.getAddress().toString(); }
 
   virtual bool tare() = 0;
   virtual bool isConnected() = 0;
@@ -38,9 +38,9 @@ public:
   virtual void disconnect() = 0;
   virtual void update() = 0;
 
+  ~RemoteScales() { clientCleanup(); }
 protected:
   RemoteScales(const DiscoveredDevice& device);
-  ~RemoteScales() { clientCleanup(); }
   const DiscoveredDevice& getDevice() const { return device; }
 
   bool clientConnect();
@@ -56,7 +56,7 @@ private:
 
   float weight = 0.f;
 
-  NimBLEClient* client;
+  NimBLEClient* client = nullptr;
   DiscoveredDevice device;
   LogCallback logCallback;
   WeightCallback weightCallback;
@@ -76,7 +76,6 @@ private:
 
 public:
   std::vector<DiscoveredDevice> getDiscoveredScales() { return discoveredScales; }
-  // std::vector<NimBLEAdvertisedDevice*> syncScan(uint16_t timeout);
 
   void initializeAsyncScan();
   void stopAsyncScan();

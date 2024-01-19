@@ -21,17 +21,12 @@ enum class AcaiaMessageType : uint8_t {
 class AcaiaScales : public RemoteScales {
 
 public:
-  AcaiaScales(NimBLEAdvertisedDevice* device);
+  AcaiaScales(const DiscoveredDevice& device);
   void update() override;
   bool connect() override;
   void disconnect() override;
   bool isConnected() override;
   bool tare() override;
-  unsigned char getBattery();
-  unsigned char getSeconds();
-  bool startTimer();
-  bool pauseTimer();
-  bool stopTimer();
 
 private:
   std::string weightUnits;
@@ -48,15 +43,12 @@ private:
 
   bool performConnectionHandshake();
   void subscribeToNotifications();
-  void log();
 
   void sendMessage(AcaiaMessageType msgType, const uint8_t* payload, size_t length, bool waitResponse = false);
   void sendEvent(const uint8_t* payload, size_t length);
   void sendHeartbeat();
   void sendNotificationRequest();
   void sendId();
-  void sendTare();
-  void sendTimerCommand(uint8_t command);
   void notifyCallback(NimBLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify);
   void decodeAndHandleNotification(uint8_t* pData, size_t length);
   void handleScaleEventPayload(const uint8_t* pData, size_t length);

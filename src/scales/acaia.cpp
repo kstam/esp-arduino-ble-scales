@@ -41,10 +41,11 @@ std::string byteArrayToHexString(const uint8_t* byteArray, size_t length) {
 //-----------------------------------------------------------------------------------/
 //---------------------------        PUBLIC       -----------------------------------/
 //-----------------------------------------------------------------------------------/
-AcaiaScales::AcaiaScales(NimBLEAdvertisedDevice* device) : RemoteScales(device) {}
+AcaiaScales::AcaiaScales(const DiscoveredDevice& device) : RemoteScales(device) {}
 
 bool AcaiaScales::connect() {
   if (RemoteScales::clientIsConnected()) {
+    RemoteScales::log("Already connected\n");
     return true;
   }
 
@@ -54,8 +55,6 @@ bool AcaiaScales::connect() {
     RemoteScales::clientCleanup();
     return false;
   }
-
-  // RemoteScales::clientSetMTU(247);
 
   if (!performConnectionHandshake()) {
     return false;
@@ -295,7 +294,7 @@ bool AcaiaScales::performConnectionHandshake() {
 
 void AcaiaScales::sendMessage(AcaiaMessageType msgType, const uint8_t* payload, size_t length, bool waitResponse) {
   size_t bufferSize = 5 + length;
-  uint8_t* bytes = new uint8_t[bufferSize];
+  auto bytes = std::make_unique<uint8_t[]>(bufferSize);
 
   bytes[0] = static_cast<uint8_t>(AcaiaHeader::HEADER1);
   bytes[1] = static_cast<uint8_t>(AcaiaHeader::HEADER2);
@@ -318,7 +317,7 @@ void AcaiaScales::sendMessage(AcaiaMessageType msgType, const uint8_t* payload, 
   bytes[length + 4] = (cksum2 & 0xFF);
 
   // RemoteScales::log("Sending: %s\n", byteArrayToHexString(bytes, bufferSize).c_str());
-  commandCharacteristic->writeValue(bytes, bufferSize, waitResponse);
+  commandCharacteristic->writeValue(bytes.get(), bufferSize, waitResponse);
 };
 
 void AcaiaScales::sendId() {
@@ -332,15 +331,14 @@ void AcaiaScales::sendNotificationRequest() {
 }
 
 void AcaiaScales::sendEvent(const uint8_t* payload, size_t length) {
-  uint8_t* bytes = new uint8_t[length + 1];
+  auto bytes = std::make_unique<uint8_t[]>(length + 1);
   bytes[0] = static_cast<uint8_t>(length + 1);
 
   for (size_t i = 0; i < length; ++i) {
     bytes[i + 1] = payload[i] & 0xFF;
   }
 
-  sendMessage(AcaiaMessageType::EVENT, bytes, length + 1);
-  delete[] bytes;
+  sendMessage(AcaiaMessageType::EVENT, bytes.get(), length + 1);
 }
 
 void AcaiaScales::sendHeartbeat() {
@@ -370,11 +368,11 @@ void AcaiaScales::subscribeToNotifications() {
 
   if (weightCharacteristic->canNotify()) {
     RemoteScales::log("Registering callback for weight characteristic\n");
-    weightCharacteristic->registerForNotify(callback);
+    weightCharacteristic->subscribe(true, callback);
   }
 
   if (commandCharacteristic->canNotify()) {
     RemoteScales::log("Registering callback for command characteristic\n");
-    commandCharacteristic->registerForNotify(callback);
+    commandCharacteristic->subscribe(true, callback);
   }
 }
