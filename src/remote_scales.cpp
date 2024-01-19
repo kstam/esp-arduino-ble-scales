@@ -53,6 +53,7 @@ void RemoteScales::clientCleanup() {
   }
   log("Cleaning up BLE client\n");
   NimBLEDevice::deleteClient(client);
+  client = nullptr;
 }
 
 NimBLERemoteService* RemoteScales::clientGetService(const NimBLEUUID uuid) {
