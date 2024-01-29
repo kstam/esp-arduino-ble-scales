@@ -15,8 +15,8 @@ public:
   const std::string& getManufacturerData() const { return manufacturerData; }
 private:
   std::string name;
-  std::string manufacturerData;
   NimBLEAddress address;
+  std::string manufacturerData;
 };
 
 class RemoteScales {

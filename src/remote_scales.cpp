@@ -78,7 +78,7 @@ void RemoteScalesScanner::initializeAsyncScan() {
   // for devices we're not interested in. This is important because the library will otherwise run out of
   // memory after a while.
   NimBLEDevice::getScan()->setAdvertisedDeviceCallbacks(this, true);
-  NimBLEDevice::getScan()->setInterval(1000);
+  NimBLEDevice::getScan()->setInterval(500);
   NimBLEDevice::getScan()->setWindow(100);
   NimBLEDevice::getScan()->setMaxResults(0);
   NimBLEDevice::getScan()->setDuplicateFilter(false);
@@ -113,27 +113,6 @@ void RemoteScalesScanner::onResult(NimBLEAdvertisedDevice* advertisedDevice) {
 void RemoteScalesScanner::cleanupDiscoveredScales() {
   discoveredScales.clear();
 }
-
-// std::vector<NimBLEAdvertisedDevice> RemoteScalesScanner::syncScan(uint16_t timeout) {
-//   NimBLEScan* scanner = NimBLEDevice::getScan();
-//   isRunning = true;
-//   scanner->setActiveScan(true);
-//   scanner->setInterval(100);
-//   scanner->setWindow(99);
-
-//   NimBLEScanResults scanResults = scanner->start(timeout, false);
-
-//   cleanupDiscoveredScales();
-//   for (int i = 0; i < scanResults.getCount(); i++) {
-//     onResult(scanResults.getDevice(i));
-//   }
-
-//   scanner->clearResults();
-//   scanner->setActiveScan(false);
-
-//   isRunning = false;
-//   return discoveredScales;
-// }
 
 bool RemoteScalesScanner::isScanRunning() {
   return isRunning;
