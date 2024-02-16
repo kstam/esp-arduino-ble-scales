@@ -9,13 +9,13 @@
 #include <memory>
 
 enum class AcaiaMessageType : uint8_t {
-  SYSTEM = 0,
-  TARE = 4,
-  HANDSHAKE = 6,
-  INFO = 7,
-  STATUS = 8,
-  IDENTIFY = 11,
-  EVENT = 12,
+  SYSTEM = 0x00,
+  TARE = 0x04,
+  HANDSHAKE = 0x06,
+  INFO = 0x07,
+  STATUS = 0x08,
+  IDENTIFY = 0x0B,
+  EVENT = 0x0C,
 };
 
 class AcaiaScales : public RemoteScales {
@@ -40,6 +40,8 @@ private:
   NimBLERemoteService* service;
   NimBLERemoteCharacteristic* weightCharacteristic;
   NimBLERemoteCharacteristic* commandCharacteristic;
+
+  std::vector<uint8_t> dataBuffer;
 
   bool performConnectionHandshake();
   void subscribeToNotifications();

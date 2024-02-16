@@ -1,25 +1,40 @@
 #include "acaia.h"
 #include "remote_scales_plugin_registry.h"
 
+/**
+* Structure inside each packet.
+* Checksums are calculated over Payload.
+* ---------------------------------------------------------------
+* |  0xEF  |  0xDD  |  0x00 |  0x00   | ....... | 0x00   | 0x00
+* ---------------------------------------------------------------
+* |     Header      |  Mesg |      Payload      |    Checksum
+* |  byte1 |  byte2 |  Type | Length  |   Data  | byte1   | byte2
+* ---------------------------------------------------------------
+*/
+
 enum class AcaiaHeader : uint8_t {
-  HEADER1 = 0xef,
-  HEADER2 = 0xdd,
+  HEADER1 = 0xEF,
+  HEADER2 = 0xDD,
 };
 
 enum class AcaiaEventType : uint8_t {
-  WEIGHT = 5,
-  BATTERY = 6,
-  TIMER = 7,
-  KEY = 8,
-  ACK = 11,
+  WEIGHT = 0x05,
+  BATTERY = 0x06,
+  TIMER = 0x07,
+  KEY = 0x08,
+  ACK = 0x0B,
 };
 
 enum class AcaiaEventKey : uint8_t {
-  TARE = 5,
-  START = 7,
-  RESET = 8,
-  STOP = 9,
+  TARE = 0x05,
+  START = 0x07,
+  RESET = 0x08,
+  STOP = 0x09,
 };
+
+const size_t HEADER_LENGTH = 3;
+const size_t CHECKSUM_LENGTH = 2; 
+const size_t MIN_MESSAGE_LENGTH = HEADER_LENGTH + CHECKSUM_LENGTH + 1;
 
 const NimBLEUUID serviceUUID("49535343-fe7d-4ae5-8fa9-9fafd205e455");
 const NimBLEUUID weightCharacteristicUUID("49535343-1e4d-4bd9-ba61-23c647249616");
@@ -78,7 +93,8 @@ void AcaiaScales::update() {
     RemoteScales::clientCleanup();
     connect();
     markedForReconnection = false;
-  } else {
+  }
+  else {
     sendHeartbeat();
   }
 }
@@ -93,6 +109,9 @@ bool AcaiaScales::tare() {
 //-----------------------------------------------------------------------------------/
 //---------------------------       PRIVATE       -----------------------------------/
 //-----------------------------------------------------------------------------------/
+static void cleanupJunkData(std::vector<uint8_t>& dataBuffer);
+static std::pair<uint8_t, uint8_t> calculateChecksum(const uint8_t* message, size_t length);
+
 void AcaiaScales::notifyCallback(
   NimBLERemoteCharacteristic* pBLERemoteCharacteristic,
   uint8_t* pData,
@@ -102,59 +121,57 @@ void AcaiaScales::notifyCallback(
   decodeAndHandleNotification(pData, length);
 }
 
-void AcaiaScales::decodeAndHandleNotification(uint8_t* data, size_t length) {
-  int messageStart = -1;
+void AcaiaScales::decodeAndHandleNotification(uint8_t* newData, size_t newDataLength) {
+  dataBuffer.insert(dataBuffer.end(), newData, newData + newDataLength);
+  cleanupJunkData(dataBuffer);
 
-  for (size_t i = 0; i < length - 1; i++) {
-    if (data[i] == static_cast<uint8_t>(AcaiaHeader::HEADER1) && data[i + 1] == static_cast<uint8_t>(AcaiaHeader::HEADER2)) {
-      messageStart = i;
-      break;
-    }
-  }
-
-  if (messageStart < 0 || length - messageStart < 6) {
-    RemoteScales::log("Invalid message - Unexpected header: %s\n", byteArrayToHexString(data, length).c_str());
+  if (dataBuffer.size() < MIN_MESSAGE_LENGTH) {
     return;
   }
 
-  size_t messageEnd = messageStart + data[messageStart + 3] + 5;
-  size_t messageLength = messageEnd - messageStart;
-
-  if (messageEnd > length) {
-    RemoteScales::log("Invalid message - length out of bounds: %s\n", byteArrayToHexString(data, length).c_str());
+  size_t messageLength = HEADER_LENGTH + dataBuffer[3] + CHECKSUM_LENGTH;
+  if (messageLength > dataBuffer.size()) {
     return;
   }
 
-  AcaiaMessageType messageType = static_cast<AcaiaMessageType>(data[messageStart + 2]);
+  uint8_t* payload = dataBuffer.data() + HEADER_LENGTH;
+  size_t payloadLength = messageLength - (HEADER_LENGTH + CHECKSUM_LENGTH);
+
+  auto checksumBytes = calculateChecksum(payload, payloadLength);
+  if (checksumBytes.first != dataBuffer[messageLength - 2] || checksumBytes.second != dataBuffer[messageLength - 1]) {
+    RemoteScales::log("Checksum failed: calc[%02X  %02X] but actual[%02X %02X]. Discarding.\n",
+      checksumBytes.first, checksumBytes.second,
+      dataBuffer[messageLength - 2], dataBuffer[messageLength - 1]
+    );
+    dataBuffer.erase(dataBuffer.begin(), dataBuffer.begin() + messageLength);
+    return;
+  }
+
+  AcaiaMessageType messageType = static_cast<AcaiaMessageType>(dataBuffer[2]);
 
   if (messageType == AcaiaMessageType::EVENT) {
-    uint8_t* eventData = data + messageStart + 4;
-    size_t eventDataLength = messageEnd - (messageStart + 4);
-    handleScaleEventPayload(eventData, eventDataLength);
-    return;
+    handleScaleEventPayload(payload, payloadLength);
   }
-
-  if (messageType == AcaiaMessageType::STATUS) {
-    uint8_t* statusData = data + messageStart + 3;
-    size_t statusDataLength = messageEnd - (messageStart + 3);
-    handleScaleStatusPayload(statusData, statusDataLength);
-    return;
+  else if (messageType == AcaiaMessageType::STATUS) {
+    handleScaleStatusPayload(payload, payloadLength);
   }
-
-  if (messageType == AcaiaMessageType::INFO) {
-    RemoteScales::log("Got info message: %s\n", byteArrayToHexString(data + messageStart, messageLength).c_str());
+  else if (messageType == AcaiaMessageType::INFO) {
+    RemoteScales::log("Got info message: %s\n", byteArrayToHexString(dataBuffer.data(), messageLength).c_str());
     // This normally means that something went wrong with the establishing a connection so we disconnect.
     markedForReconnection = true;
   }
+  else {
+    RemoteScales::log("Unknown message type %02X: %s\n", messageType, byteArrayToHexString(dataBuffer.data(), messageLength).c_str());
+  }
 
-  RemoteScales::log("Unknown message type %02X: %s\n", messageType, byteArrayToHexString(data + messageStart, messageLength).c_str());
-  return;
+  //Remove processed data packet from the buffer.
+  dataBuffer.erase(dataBuffer.begin(), dataBuffer.begin() + messageLength);
 }
 
 void AcaiaScales::handleScaleEventPayload(const uint8_t* payload, size_t length) {
-  AcaiaEventType eventType = static_cast<AcaiaEventType>(payload[0]);
+  AcaiaEventType eventType = static_cast<AcaiaEventType>(payload[1]);
   if (eventType == AcaiaEventType::WEIGHT) {
-    RemoteScales::setWeight(decodeWeight(payload + 1));
+    RemoteScales::setWeight(decodeWeight(payload + 2));
   }
   else if (eventType == AcaiaEventType::ACK) {
     // Ignore for now.
@@ -205,19 +222,19 @@ void AcaiaScales::handleScaleEventPayload(const uint8_t* payload, size_t length)
   }
 }
 
-void AcaiaScales::handleScaleStatusPayload(const uint8_t* data, size_t length) {
-  battery = data[1] & 0x7F;
-  if (data[2] == 2) {
+void AcaiaScales::handleScaleStatusPayload(const uint8_t* payload, size_t length) {
+  battery = payload[1] & 0x7F;
+  if (payload[2] == 2) {
     weightUnits = "grams";
   }
-  else if (data[2] == 5) {
+  else if (payload[2] == 5) {
     weightUnits = "ounces";
   }
   else {
     weightUnits = "";
   }
-  uint8_t auto_off = data[4] * 5;
-  bool beep_on = (data[6] == 1);
+  // uint8_t auto_off = payload[4] * 5;
+  // bool beep_on = (payload[6] == 1);
 }
 
 float AcaiaScales::decodeWeight(const uint8_t* weightPayload) {
@@ -292,34 +309,6 @@ bool AcaiaScales::performConnectionHandshake() {
   return true;
 }
 
-void AcaiaScales::sendMessage(AcaiaMessageType msgType, const uint8_t* payload, size_t length, bool waitResponse) {
-  size_t bufferSize = 5 + length;
-  auto bytes = std::make_unique<uint8_t[]>(bufferSize);
-
-  bytes[0] = static_cast<uint8_t>(AcaiaHeader::HEADER1);
-  bytes[1] = static_cast<uint8_t>(AcaiaHeader::HEADER2);
-  bytes[2] = static_cast<uint8_t>(msgType);
-  uint8_t cksum1 = 0;
-  uint8_t cksum2 = 0;
-
-  for (size_t i = 0; i < length; i++) {
-    uint8_t val = static_cast<uint8_t>(payload[i]) & 0xFF;
-    bytes[3 + i] = val;
-    if (i % 2 == 0) {
-      cksum1 += val;
-    }
-    else {
-      cksum2 += val;
-    }
-  }
-
-  bytes[length + 3] = (cksum1 & 0xFF);
-  bytes[length + 4] = (cksum2 & 0xFF);
-
-  // RemoteScales::log("Sending: %s\n", byteArrayToHexString(bytes, bufferSize).c_str());
-  commandCharacteristic->writeValue(bytes.get(), bufferSize, waitResponse);
-};
-
 void AcaiaScales::sendId() {
   const uint8_t payload[] = { 0x2d,0x2d,0x2d,0x2d,0x2d,0x2d,0x2d,0x2d,0x2d,0x2d,0x2d,0x2d,0x2d,0x2d,0x2d };
   sendMessage(AcaiaMessageType::IDENTIFY, payload, 15, false);
@@ -364,7 +353,7 @@ void AcaiaScales::subscribeToNotifications() {
 
   auto callback = [this](NimBLERemoteCharacteristic* characteristic, uint8_t* data, size_t length, bool isNotify) {
     notifyCallback(characteristic, data, length, isNotify);
-  };
+    };
 
   if (weightCharacteristic->canNotify()) {
     RemoteScales::log("Registering callback for weight characteristic\n");
@@ -374,5 +363,61 @@ void AcaiaScales::subscribeToNotifications() {
   if (commandCharacteristic->canNotify()) {
     RemoteScales::log("Registering callback for command characteristic\n");
     commandCharacteristic->subscribe(true, callback);
+  }
+}
+
+void AcaiaScales::sendMessage(AcaiaMessageType msgType, const uint8_t* payload, size_t length, bool waitResponse) {
+  size_t messageSize = HEADER_LENGTH + length + CHECKSUM_LENGTH;
+  auto bytes = std::make_unique<uint8_t[]>(messageSize);
+
+  // Header
+  bytes[0] = static_cast<uint8_t>(AcaiaHeader::HEADER1);
+  bytes[1] = static_cast<uint8_t>(AcaiaHeader::HEADER2);
+  bytes[2] = static_cast<uint8_t>(msgType);
+
+  // Payload
+  memcpy(bytes.get() + HEADER_LENGTH, payload, length);
+
+  // Checksum
+  auto checksums = calculateChecksum(payload, length);
+  bytes[length + 3] = (checksums.first & 0xFF);
+  bytes[length + 4] = (checksums.second & 0xFF);
+
+  commandCharacteristic->writeValue(bytes.get(), messageSize, waitResponse);
+};
+
+// Calculate the checksum for the payload of the message
+static std::pair<uint8_t, uint8_t> calculateChecksum(const uint8_t* payload, size_t length) {
+  uint8_t cksum1 = 0;
+  uint8_t cksum2 = 0;
+
+  for (size_t i = 0; i < length; i++) {
+    if (i % 2 == 0) {
+      cksum1 += payload[i];
+    }
+    else {
+      cksum2 += payload[i];
+    }
+  }
+
+  return { cksum1 & 0xFF, cksum2 & 0xFF };
+}
+
+// Discard junk data so that the first element of the buffer is the start of a message
+static void cleanupJunkData(std::vector<uint8_t>& dataBuffer) {
+  int messageStart = 0;
+
+  // Find the start of the message
+  while (messageStart < dataBuffer.size() - 1
+    && dataBuffer[messageStart] != (uint8_t)AcaiaHeader::HEADER1
+    && dataBuffer[messageStart + 1] != (uint8_t)(AcaiaHeader::HEADER2)
+    ) {
+    messageStart++;
+  }
+
+  // Clear everything before the start of the message
+  dataBuffer.erase(dataBuffer.begin(), dataBuffer.begin() + messageStart);
+  if (messageStart == dataBuffer.size() - 1 && dataBuffer[messageStart] != (uint8_t)AcaiaHeader::HEADER1) {
+    dataBuffer.clear();
   }
 }
