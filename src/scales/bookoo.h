@@ -63,6 +63,6 @@ public:
 private:
   static bool handles(const DiscoveredDevice& device) {
     const std::string& deviceName = device.getName();
-    return !deviceName.empty() && (deviceName.find("BOOKO") == 0);
+    return !deviceName.empty() && (deviceName.find("BOOKOO_SC") == 0);
   }
 };
